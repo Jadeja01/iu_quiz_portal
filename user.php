@@ -1,17 +1,14 @@
 <?php
 session_start();
+include "./connect.php";
 
-// Redirect if not logged in
-if (!isset($_SESSION['id'])) {
+// Ensure user is logged in
+if(!isset($_SESSION['id']) || $_SESSION['role'] !== 'user'){
     header("Location: index.php");
     exit;
 }
 
-// Optional: restrict admin access
-if ($_SESSION['role'] === 'admin') {
-    header("Location: admin.php");
-    exit;
-}
+$user_id = $_SESSION['id'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -22,52 +19,68 @@ if ($_SESSION['role'] === 'admin') {
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-
-<!-- Navbar -->
 <?php include "navbar.php"; ?>
 
 <div class="container my-5">
-  <h2 class="mb-4">Available Quizzes</h2>
-  <div id="quizContainer"></div>
+    <h2>Welcome, <?php echo $_SESSION['username']; ?> 👋</h2>
+
+    <!-- Search Box for Quiz Code -->
+    <div class="input-group mb-3">
+        <input type="text" id="quizCodeInput" class="form-control" placeholder="Enter Quiz Code">
+        <button class="btn btn-primary" onclick="searchQuiz()">Find Quiz</button>
+    </div>
+
+    <!-- User's Attempted Quizzes -->
+    <h4>Your Attempted Quizzes</h4>
+    <div id="attemptedQuizzes"></div>
 </div>
 
 <script>
-// Load quizzes for user
-function loadQuizzes() {
-    fetch('api/get_quizzes.php')
-    .then(res => res.json())
-    .then(data => {
-        const container = document.getElementById('quizContainer');
-        container.innerHTML = '';
-        if(data.length === 0){
-            container.innerHTML = '<p>No quizzes available.</p>';
-            return;
-        }
-        data.forEach(q => {
-            const card = document.createElement('div');
-            card.className = 'card mb-3';
-            card.innerHTML = `
+async function loadAttempts() {
+    const res = await fetch("/get_user_attempts.php");
+    const data = await res.json();
+    console.log("Data:",data);
+    const container = document.getElementById("attemptedQuizzes");
+
+    container.innerHTML = "";
+    if(data.success && data.attempts.length > 0){
+        data.attempts.forEach(a => {
+            const div = document.createElement("div");
+            div.className = "card mb-3";
+            div.innerHTML = `
                 <div class="card-body">
-                    <h5>${q.title}</h5>
-                    <p>${q.description}</p>
-                    <button class="btn btn-success" onclick="startQuiz(${q.id}, '${q.title}')">Start Quiz</button>
+                    <h5>${a.title}</h5>
+                    <p>Score: ${a.score}/${a.total}</p>
                 </div>
             `;
-            container.appendChild(card);
+            container.appendChild(div);
         });
-    });
+    } else {
+        container.innerHTML = "<p>No quizzes attempted yet.</p>";
+    }
 }
 
-// Start quiz function (redirect or alert)
-function startQuiz(id, title){
-    alert(`Starting Quiz: ${title} (ID: ${id})`);
-    // You can redirect to a quiz page, e.g., quiz.php?id=${id}
+// Search quiz by code
+async function searchQuiz(){
+    const code = document.getElementById("quizCodeInput").value.trim();
+   	console.log(code)
+    if(!code){ alert("Enter a quiz code!"); return; }
+
+    const res = await fetch(`/get_quiz_by_code.php?code=${code}`);
+    const data = await res.json();
+    console.log("quizdata:",data);
+
+    if(data.success){
+        // Redirect user to quiz page
+        window.location.href = `/quiz.php?code=${data.quiz.quiz_code}`;
+    } else {
+        alert("Quiz not found!");
+    }
 }
 
-// Initial load
-loadQuizzes();
+// Initial Load
+loadAttempts();
 </script>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
