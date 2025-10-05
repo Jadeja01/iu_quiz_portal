@@ -3,7 +3,7 @@ session_start();
 include "connect.php";
 
 if(!isset($_SESSION['id']) || $_SESSION['role'] !== 'admin'){
-    header("Location: index.php");
+    echo json_encode(["success" => false, "message" => "Unauthorized"]);
     exit;
 }
 

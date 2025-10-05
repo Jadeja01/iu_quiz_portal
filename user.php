@@ -2,7 +2,6 @@
 session_start();
 include "./connect.php";
 
-// Ensure user is logged in
 if(!isset($_SESSION['id']) || $_SESSION['role'] !== 'user'){
     header("Location: index.php");
     exit;

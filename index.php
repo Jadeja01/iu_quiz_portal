@@ -1,6 +1,21 @@
 <?php
 include "./connect.php";
 session_start();
+if (isset($_SESSION['id'])) {
+    $role = $_SESSION['role'] ?? '';
+
+    if ($role === 'admin') {
+        header("Location: admin.php");
+        exit;
+    } elseif ($role === 'user') {
+        header("Location: user.php");
+        exit;
+    } else {
+        session_destroy();
+        header("Location: index.php");
+        exit;
+    }
+}
 $isLoggedIn = isset($_SESSION['id']);
 $username   = $_SESSION['username'] ?? '';
 $role       = $_SESSION['role'] ?? '';
