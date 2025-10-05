@@ -2,34 +2,51 @@
 session_start();
 include "./connect.php";
 
-// Only allow logged-in users
-if(!isset($_SESSION['id']) || $_SESSION['role'] !== 'user'){
+if (!isset($_SESSION['id']) || $_SESSION['role'] !== 'user') {
     header("Location: index.php");
     exit;
 }
 
-if(!isset($_GET['code'])){
+$user_id = $_SESSION['id'];
+
+if (!isset($_GET['code']) || empty($_GET['code'])) {
     echo "Quiz code missing!";
     exit;
 }
 
 $quiz_code = $_GET['code'];
 
-// Fetch quiz details
 $stmt = $conn->prepare("SELECT id, title, description FROM quizzes WHERE quiz_code = ?");
 $stmt->bind_param("s", $quiz_code);
 $stmt->execute();
 $quiz = $stmt->get_result()->fetch_assoc();
 
-if(!$quiz){
+if (!$quiz) {
     echo "Quiz not found!";
     exit;
 }
 
 $quiz_id = $quiz['id'];
 
-// Fetch questions with their options
-$qstmt = $conn->prepare("SELECT * FROM questions WHERE quiz_id=?");
+//Check if user already attempted this quiz
+$check = $conn->prepare("
+    SELECT COUNT(*) AS cnt 
+    FROM user_attempts ua
+    INNER JOIN questions q ON ua.question_id = q.id
+    WHERE ua.user_id = ? AND q.quiz_id = ?
+");
+$check->bind_param("ii", $user_id, $quiz_id);
+$check->execute();
+$check_res = $check->get_result()->fetch_assoc();
+
+if ($check_res['cnt'] > 0) {
+    // Already attempted → prevent re-entry
+    echo "<script>alert('You have already attempted this quiz!'); window.location.href='/user.php';</script>";
+    exit;
+}
+
+//Fetch questions for this quiz
+$qstmt = $conn->prepare("SELECT * FROM questions WHERE quiz_id = ?");
 $qstmt->bind_param("i", $quiz_id);
 $qstmt->execute();
 $questions = $qstmt->get_result();
@@ -50,17 +67,17 @@ $questions = $qstmt->get_result();
     <input type="hidden" name="quiz_id" value="<?php echo $quiz_id; ?>">
     <?php 
     $qno = 1;
-    while($q = $questions->fetch_assoc()): ?>
+    while ($q = $questions->fetch_assoc()): ?>
         <div class="mb-4">
             <h5><?php echo $qno++ . ". " . htmlspecialchars($q['question_text']); ?></h5>
             <?php 
             // Fetch options for this question
-            $astmt = $conn->prepare("SELECT id, answer_text FROM answers WHERE question_id=?");
+            $astmt = $conn->prepare("SELECT id, answer_text FROM answers WHERE question_id = ?");
             $astmt->bind_param("i", $q['id']);
             $astmt->execute();
             $optionsRes = $astmt->get_result();
 
-            while($opt = $optionsRes->fetch_assoc()): ?>
+            while ($opt = $optionsRes->fetch_assoc()): ?>
                 <div class="form-check">
                     <input class="form-check-input" type="radio" 
                            name="q_<?php echo $q['id']; ?>" 
@@ -84,7 +101,7 @@ document.getElementById('quizForm').addEventListener('submit', async e => {
         const res = await fetch("/submit_quiz.php", {
             method: "POST",
             body: JSON.stringify(data),
-            headers: {"Content-Type":"application/json"}
+            headers: {"Content-Type": "application/json"}
         });
         const result = await res.json();
         if(result.success){

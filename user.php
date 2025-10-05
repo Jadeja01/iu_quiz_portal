@@ -61,22 +61,45 @@ async function loadAttempts() {
 }
 
 // Search quiz by code
-async function searchQuiz(){
+async function searchQuiz() {
     const code = document.getElementById("quizCodeInput").value.trim();
-   	console.log(code)
-    if(!code){ alert("Enter a quiz code!"); return; }
+    if (!code) { alert("Enter a quiz code!"); return; }
 
     const res = await fetch(`/get_quiz_by_code.php?code=${code}`);
     const data = await res.json();
-    console.log("quizdata:",data);
+    console.log("quizdata:", data);
 
-    if(data.success){
-        // Redirect user to quiz page
-        window.location.href = `/quiz.php?code=${data.quiz.quiz_code}`;
+    const container = document.getElementById("attemptedQuizzes");
+
+    if (data.success) {
+        const quiz = data.quiz;
+        const alreadyAttempted = data.already_attempted;
+
+        const div = document.createElement("div");
+        div.className = "card mt-3";
+        div.innerHTML = `
+            <div class="card-body">
+                <h5>${quiz.title}</h5>
+                <p>${quiz.description || ""}</p>
+                <button id="startBtn" class="btn ${alreadyAttempted ? "btn-secondary" : "btn-primary"}" ${alreadyAttempted ? "disabled" : ""}>
+                    ${alreadyAttempted ? "Already Attempted" : "Start Quiz"}
+                </button>
+            </div>
+        `;
+
+        container.innerHTML = "";
+        container.appendChild(div);
+
+        if (!alreadyAttempted) {
+            document.getElementById("startBtn").addEventListener("click", () => {
+                window.location.href = `/quiz.php?code=${quiz.quiz_code}`;
+            });
+        }
     } else {
         alert("Quiz not found!");
     }
 }
+
 
 // Initial Load
 loadAttempts();
